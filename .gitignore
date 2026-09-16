@@ -1,0 +1,7 @@
+# 本地配置文件含令牌，禁止提交到 GitHub
+config.json
+
+# 依赖与系统文件
+node_modules/
+.DS_Store
+Thumbs.db

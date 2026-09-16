@@ -1,0 +1,10 @@
+{
+  "name": "pandian-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "盘点录入：网页表单 -> WPS 多维表格（Vercel Serverless 代理）",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  }
+}

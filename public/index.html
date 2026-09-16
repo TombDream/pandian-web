@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>盘点录入 · 云仓</title>
+<style>
+  :root{
+    --bg:#f4f6f9; --card:#ffffff; --line:#e6e9ef; --txt:#1c2330; --sub:#6b7484;
+    --blue:#2f6fed; --blue-soft:#eaf1fe; --green:#0f9d6c; --green-soft:#e7f7f0;
+    --red:#e5484d; --red-soft:#fdebec; --amber:#b7791f; --amber-soft:#fdf6e7;
+    --radius:12px; --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+  .layout{display:flex;min-height:100vh}
+
+  /* ===== 左导航 ===== */
+  .sidenav{width:220px;flex-shrink:0;background:#fff;border-right:1px solid var(--line);position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+  .brand{display:flex;align-items:center;gap:10px;padding:20px 18px;border-bottom:1px solid var(--line)}
+  .brand-logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#2f6fed,#5b8cff);display:flex;align-items:center;justify-content:center;color:#fff}
+  .brand-name{font-weight:700;font-size:15px}
+  .brand-sub{font-size:11px;color:var(--sub)}
+  .nav-group{padding:14px 10px;flex:1}
+  .nav-label{font-size:11px;color:var(--sub);padding:4px 10px 8px;letter-spacing:.05em}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#3c465a;cursor:pointer;margin-bottom:2px;position:relative;user-select:none}
+  .nav-item:hover{background:#f5f7fb}
+  .nav-item.active{background:var(--blue-soft);color:var(--blue);font-weight:600}
+  .nav-item.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--blue)}
+  .nav-item svg{flex-shrink:0}
+  .nav-badge{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#eef1f6;color:var(--sub);font-size:11px;display:flex;align-items:center;justify-content:center}
+  .nav-item.active .nav-badge{background:#dce7fd;color:var(--blue)}
+  .side-foot{padding:14px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--sub)}
+  .conn-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#c3cad6}
+  .conn-dot.ok{background:var(--green)} .conn-dot.mock{background:var(--amber)}
+
+  /* ===== 右侧主区 ===== */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0}
+  .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:16px;padding:14px 28px;background:rgba(255,255,255,.82);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .topbar h1{font-size:17px;font-weight:700}
+  .topbar .desc{font-size:12px;color:var(--sub)}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .pill{font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--sub);display:flex;align-items:center;gap:6px}
+  .pill b{font-weight:600}
+  .content{flex:1;padding:26px 28px 48px;max-width:1060px;width:100%;margin:0 auto}
+
+  /* ===== 卡片与表单 ===== */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px 26px;margin-bottom:20px}
+  .card-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px}
+  .card-head h2{font-size:15px;font-weight:700}
+  .card-head span{font-size:12px;color:var(--sub)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px 22px}
+  .field{display:flex;flex-direction:column;gap:7px}
+  .field.full{grid-column:1/-1}
+  .field label{font-size:13px;font-weight:600;color:#333c4e}
+  .field label em{font-style:normal;color:var(--red);margin-left:2px}
+  .input-wrap{position:relative}
+  .input-wrap .lead-ic{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9aa3b5;pointer-events:none}
+  input[type=text],input[type=number]{
+    width:100%;height:42px;border:1px solid #d8dde7;border-radius:9px;padding:0 12px 0 38px;
+    font-size:14px;color:var(--txt);background:#fff;outline:none;transition:border .15s,box-shadow .15s;font-family:inherit}
+  input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.12)}
+  input::placeholder{color:#a7afc0}
+  .spin{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;border:2px solid #d5dbe6;border-top-color:var(--blue);border-radius:50%;animation:rot .7s linear infinite;display:none}
+  .input-wrap.loading .spin{display:block}
+  @keyframes rot{to{transform:translateY(-50%) rotate(360deg)}}
+  .hint{font-size:12px;color:var(--sub)}
+  .kbd{display:inline-block;padding:0 5px;border:1px solid #d8dde7;border-bottom-width:2px;border-radius:5px;font-size:11px;background:#fafbfc;color:#4a5468;font-family:inherit}
+
+  /* 品名结果条 */
+  .name-result{grid-column:1/-1;display:none;margin-top:-6px}
+  .name-result.show{display:block}
+  .name-chip{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:9px;font-size:13px}
+  .name-chip svg{flex-shrink:0}
+  .name-chip.ok{background:var(--green-soft);color:var(--green)}
+  .name-chip.multi{background:var(--amber-soft);color:var(--amber)}
+  .name-chip.none{background:var(--red-soft);color:var(--red)}
+  .name-chip b{font-weight:600}
+  .name-chip .link-btn{margin-left:auto;background:none;border:none;color:inherit;font-size:12px;cursor:pointer;text-decoration:underline;font-family:inherit}
+
+  .form-actions{grid-column:1/-1;display:flex;align-items:center;gap:14px;margin-top:6px}
+  .btn{height:42px;padding:0 26px;border-radius:9px;border:none;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;transition:filter .15s,transform .05s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--blue);color:#fff}
+  .btn-primary:hover{filter:brightness(1.08)}
+  .btn-primary:disabled{background:#a9c1f5;cursor:not-allowed}
+  .btn-ghost{background:#fff;border:1px solid #d8dde7;color:#3c465a}
+  .btn-ghost:hover{background:#f5f7fb}
+  .form-msg{font-size:12.5px}
+  .form-msg.ok{color:var(--green)} .form-msg.err{color:var(--red)}
+
+  /* 会话记录表 */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{ text-align:left;padding:9px 12px;color:var(--sub);font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:9px 12px;border-bottom:1px solid #f0f2f6;word-break:break-all}
+  tr:last-child td{border-bottom:none}
+  .empty-row{color:#a7afc0;text-align:center;padding:22px 0!important}
+  .tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11.5px;font-weight:600}
+  .tag-blue{background:var(--blue-soft);color:var(--blue)}
+  .tag-green{background:var(--green-soft);color:var(--green)}
+
+  /* ===== 弹窗：多品名选择 ===== */
+  .overlay{position:fixed;inset:0;background:rgba(15,22,35,.45);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:100}
+  .overlay.show{display:flex}
+  .modal{width:520px;max-width:calc(100vw - 40px);max-height:80vh;background:#fff;border-radius:14px;box-shadow:0 24px 64px rgba(15,22,35,.3);display:flex;flex-direction:column;overflow:hidden;animation:pop .18s ease-out}
+  @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal-head{padding:18px 22px 14px;border-bottom:1px solid var(--line)}
+  .modal-head h3{font-size:15px;display:flex;align-items:center;gap:8px}
+  .modal-head h3 svg{color:var(--amber)}
+  .modal-head p{font-size:12.5px;color:var(--sub);margin-top:5px}
+  .modal-head p b{color:var(--txt);font-family:ui-monospace,Consolas,monospace;letter-spacing:.02em}
+  .modal-list{overflow-y:auto;padding:10px}
+  .cand{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:10px;cursor:pointer;border:1px solid transparent}
+  .cand:hover{background:var(--blue-soft);border-color:#c7d8fb}
+  .cand .cand-no{width:64px;flex-shrink:0}
+  .cand .cand-no .tag{font-family:ui-monospace,Consolas,monospace}
+  .cand .cand-name{flex:1;font-size:13.5px;font-weight:500;line-height:1.4}
+  .cand .cand-bc{font-size:11.5px;color:var(--sub);font-family:ui-monospace,Consolas,monospace;margin-top:3px}
+  .cand .pick{flex-shrink:0;font-size:12px;color:var(--blue);font-weight:600}
+  .modal-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub)}
+
+  /* 使用说明 */
+  .help-steps{counter-reset:s}
+  .help-item{display:flex;gap:14px;padding:12px 0;border-bottom:1px dashed #eef0f5}
+  .help-item:last-child{border-bottom:none}
+  .step-no{counter-increment:s;flex-shrink:0;width:26px;height:26px;border-radius:8px;background:var(--blue-soft);color:var(--blue);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .step-no::before{content:counter(s)}
+  .help-item h4{font-size:13.5px;margin-bottom:4px}
+  .help-item p{font-size:12.5px;color:var(--sub);line-height:1.7}
+  .help-item code{background:#f2f4f8;padding:1px 6px;border-radius:5px;font-size:12px;color:#37415a}
+
+  /* toast */
+  .toast{position:fixed;top:74px;left:50%;transform:translateX(-50%) translateY(-8px);background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:11px 20px;font-size:13.5px;display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:all .22s;z-index:200}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.ok svg{color:var(--green)} .toast.err svg{color:var(--red)}
+
+  @media (max-width:860px){
+    .sidenav{display:none}
+    .form-grid{grid-template-columns:1fr}
+  }
+  @media print{
+    .sidenav,.topbar,.form-actions,.toast,.overlay{display:none!important}
+    .card{box-shadow:none;border:none;padding:0}
+    body{background:#fff}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 左导航 -->
+  <aside class="sidenav">
+    <div class="brand">
+      <div class="brand-logo">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h6v3H9z"/><path d="M6 6h2M16 6h2"/><rect x="4" y="7" width="16" height="14" rx="2"/><path d="M9 12h6M9 16h4"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">盘点录入</div>
+        <div class="brand-sub">WPS 多维表格 · 云仓</div>
+      </div>
+    </div>
+    <nav class="nav-group">
+      <div class="nav-label">功能</div>
+      <div class="nav-item active" data-view="entry">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        盘点录入
+      </div>
+      <div class="nav-item" data-view="records">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        本次会话记录
+        <span class="nav-badge" id="navCount">0</span>
+      </div>
+      <div class="nav-label" style="margin-top:14px">支持</div>
+      <div class="nav-item" data-view="help">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1.9-1.1 1.7"/><path d="M12 17h.01"/></svg>
+        使用说明
+      </div>
+    </nav>
+    <div class="side-foot">
+      <span class="conn-dot" id="connDot"></span><span id="connText">检查服务中…</span>
+    </div>
+  </aside>
+
+  <!-- 主区 -->
+  <div class="main">
+    <header class="topbar">
+      <div>
+        <h1 id="viewTitle">盘点录入</h1>
+        <div class="desc" id="viewDesc">扫条码 / 输条码，自动识别品名；同条码多品名时弹窗选择</div>
+      </div>
+      <div class="topbar-right">
+        <span class="pill" id="modePill">服务：<b>检测中</b></span>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- 录入表单 -->
+      <section id="view-entry" class="view">
+        <div class="card">
+          <div class="card-head"><h2>入库盘点登记</h2><span>带 <em style="color:var(--red);font-style:normal">*</em> 为必填</span></div>
+          <form id="form" class="form-grid" autocomplete="off">
+            <div class="field">
+              <label>条码<em>*</em></label>
+              <div class="input-wrap" id="bcWrap">
+                <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6V4h2M18 4h2v2M20 18v2h-2M6 20H4v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg></span>
+                <input type="text" id="barcode" placeholder="扫码或输入货品条码" inputmode="numeric">
+                <span class="spin"></span>
+              </div>
+              <span class="hint">输完按 <span class="kbd">Enter</span> 或移开焦点自动查询品名</span>
+            </div>
+            <div class="field">
+              <label>库位<em>*</em></label>
+              <div class="input-wrap">
+                <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-6h6v6M3 21h18"/></svg></span>
+                <input type="text" id="loc" placeholder="如 B-03-02">
+              </div>
+            </div>
+            <div class="field">
+              <label>数量<em>*</em></label>
+              <div class="input-wrap">
+                <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="0"/></svg></span>
+                <input type="number" id="qty" placeholder="0" min="0" step="1">
+              </div>
+            </div>
+            <div class="field">
+              <label>生产日期</label>
+              <div class="input-wrap">
+                <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></span>
+                <input type="text" id="prodDate" placeholder="20260916" inputmode="numeric" maxlength="8" data-date="1">
+              </div>
+            </div>
+            <div class="field">
+              <label>到期日期</label>
+              <div class="input-wrap">
+                <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg></span>
+                <input type="text" id="expDate" placeholder="20270916" inputmode="numeric" maxlength="8" data-date="1">
+              </div>
+              <span class="hint" style="grid-column:1">直接输 8 位数字，如 20270916</span>
+            </div>
+            <div class="field">
+              <label>品名（自动识别）</label>
+              <div class="input-wrap">
+                <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 12 22l-8-8V4h10l6.6 6.6a2 2 0 0 1 0 2.8Z"/><circle cx="8.5" cy="8.5" r="1"/></svg></span>
+                <input type="text" id="pname" placeholder="由条码自动带出" readonly>
+              </div>
+            </div>
+
+            <div class="name-result" id="nameResult"></div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M5 12l5 5L20 7"/></svg>提交入库
+              </button>
+              <button type="button" class="btn btn-ghost" id="resetBtn">清空</button>
+              <span class="form-msg" id="formMsg"></span>
+            </div>
+          </form>
+        </div>
+
+        <!-- 会话记录 -->
+        <div class="card" id="sessionCard" style="display:none">
+          <div class="card-head"><h2>本次会话已提交</h2><span>仅存于本页，刷新即清空；正式数据以多维表格为准</span></div>
+          <table>
+            <thead><tr><th style="width:52px">#</th><th>条码</th><th>品名</th><th>库位</th><th>数量</th><th>生产日期</th><th>到期日期</th></tr></thead>
+            <tbody id="sessionBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 使用说明 -->
+      <section id="view-help" class="view" style="display:none">
+        <div class="card">
+          <div class="card-head"><h2>首次使用配置</h2><span>约 3 分钟</span></div>
+          <div class="help-steps">
+            <div class="help-item"><div class="step-no"></div><div>
+              <h4>在多维表格中挂载脚本</h4>
+              <p>打开「测试盘点」多维表格 → <code>脚本</code> → 新建 AirScript 脚本，把项目目录下 <code>airscript.js</code> 的内容全部粘贴进去。</p>
+            </div></div>
+            <div class="help-item"><div class="step-no"></div><div>
+              <h4>开启 Webhook 并复制凭据</h4>
+              <p>在脚本编辑器里开启 Webhook：复制「脚本 webhook 地址」和「脚本令牌」。</p>
+            </div></div>
+            <div class="help-item"><div class="step-no"></div><div>
+              <h4>填写 config.json</h4>
+              <p>把 webhook 地址和令牌填入 <code>pandian-web/config.json</code>，并将 <code>"mock": true</code> 改为 <code>false</code>，重启 <code>node server.js</code>。</p>
+            </div></div>
+            <div class="help-item"><div class="step-no"></div><div>
+              <h4>确认两张数据表</h4>
+              <p>「货品资料」表需含列：<code>产品编号 / 产品名称 / 货品条码</code>；「盘点数据」表建议包含：<code>库位 / 条码 / 数量 / 生产日期 / 到期日期 / 产品编号 / 产品名称</code>（缺列不会报错，对应字段会被跳过）。</p>
+            </div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>同条码多品名规则</h2></div>
+          <div class="help-item"><div class="step-no"></div><div>
+            <p style="margin-top:4px">货品资料中同一基础条码会用 <code>-1</code>、<code>-2</code> 等后缀区分不同品名，例如 <code>6975983219135</code> 与 <code>6975983219135-2</code>。本页按<strong>去掉后缀后的基础条码</strong>匹配：</p>
+            <p style="margin-top:6px">· 匹配到 1 个品名 → 自动带出，直接提交；<br>· 匹配到多个品名 → 弹窗列出全部候选，点选后自动填入；<br>· 未匹配到 → 红色提示，请先在货品资料表中登记该条码。</p>
+          </div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- 多品名选择弹窗 -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>该条码对应多个品名</h3>
+      <p>基础条码 <b id="modalBarcode">-</b> 下共找到 <b id="modalCount">0</b> 个品名，请点选实际产品</p>
+    </div>
+    <div class="modal-list" id="modalList"></div>
+    <div class="modal-foot"><span>支持按 <span class="kbd">1</span> <span class="kbd">2</span> <span class="kbd">3</span> 数字键快速选择</span><span>按 <span class="kbd">Esc</span> 取消</span></div>
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  var state = { matches: [], picked: null, session: [] };
+
+  /* ---------- 导航切换 ---------- */
+  var viewMeta = {
+    entry:   { title: "盘点录入", desc: "扫条码 / 输条码，自动识别品名；同条码多品名时弹窗选择" },
+    records: { title: "本次会话记录", desc: "仅存于本页，刷新即清空；正式数据以多维表格为准" },
+    help:    { title: "使用说明", desc: "首次使用请按步骤完成 Webhook 配置" }
+  };
+  document.querySelectorAll(".nav-item").forEach(function (item) {
+    item.addEventListener("click", function () {
+      document.querySelectorAll(".nav-item").forEach(function (n) { n.classList.remove("active"); });
+      item.classList.add("active");
+      var v = item.dataset.view;
+      document.querySelectorAll(".view").forEach(function (s) { s.style.display = "none"; });
+      $("view-" + v).style.display = "";
+      $("viewTitle").textContent = viewMeta[v].title;
+      $("viewDesc").textContent = viewMeta[v].desc;
+      if (v === "records") renderSession();
+    });
+  });
+
+  /* ---------- 服务状态 ---------- */
+  fetch("/api/status").then(function (r) { return r.json(); }).then(function (s) {
+    var dot = $("connDot"), txt = $("connText"), pill = $("modePill");
+    if (s.configured) { dot.className = "conn-dot ok"; txt.textContent = "已连接多维表格"; pill.innerHTML = "服务：<b>已对接 WPS</b>"; }
+    else if (s.mock) { dot.className = "conn-dot mock"; txt.textContent = "模拟数据模式"; pill.innerHTML = "服务：<b>MOCK 模拟</b>"; }
+    else { dot.className = "conn-dot"; txt.textContent = "未配置 Webhook"; pill.innerHTML = "服务：<b>未配置</b>"; }
+  }).catch(function () {
+    $("connText").textContent = "服务未启动";
+  });
+
+  /* ---------- 条码查询 ---------- */
+  var queryTimer = null;
+  function queryBarcode() {
+    var bc = $("barcode").value.trim();
+    resetPick();
+    if (bc.length < 6) return; // 太短不查
+    $("bcWrap").classList.add("loading");
+    fetch("/api/airscript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Context: { argv: { action: "query", barcode: bc } } })
+    }).then(function (r) { return r.json(); }).then(function (resp) {
+      $("bcWrap").classList.remove("loading");
+      var r = resp && resp.result;
+      if (!r || r.code !== 0) {
+        showNameResult("none", "查询失败：" + ((r && r.message) || (resp && resp.error) || "未知错误"), null);
+        return;
+      }
+      state.matches = r.matches || [];
+      if (state.matches.length === 0) {
+        showNameResult("none", "未找到该条码对应的品名，请核对条码或先在「货品资料」中登记", null);
+      } else if (state.matches.length === 1) {
+        applyPick(state.matches[0]);
+        showNameResult("ok", "已自动匹配 1 个品名", null);
+      } else {
+        showNameResult("multi", "该条码有 " + state.matches.length + " 个品名，点击选择", openModal);
+      }
+    }).catch(function (e) {
+      $("bcWrap").classList.remove("loading");
+      showNameResult("none", "请求失败：" + e.message, null);
+    });
+  }
+
+  $("barcode").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(queryTimer); queryBarcode(); }
+  });
+  $("barcode").addEventListener("input", function () {
+    resetPick(); hideNameResult();
+    clearTimeout(queryTimer);
+    var v = this.value.trim();
+    if (v.length >= 6) queryTimer = setTimeout(queryBarcode, 500);
+  });
+
+  function showNameResult(type, text, actionFn) {
+    var box = $("nameResult");
+    var icons = {
+      ok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>',
+      multi: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+      none: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>'
+    };
+    box.className = "name-result show";
+    box.innerHTML = '<div class="name-chip ' + type + '">' + icons[type] +
+      "<span>" + text + "</span>" +
+      (actionFn ? '<button type="button" class="link-btn">选择品名</button>' : "") + "</div>";
+    if (actionFn) box.querySelector(".link-btn").addEventListener("click", actionFn);
+  }
+  function hideNameResult() { $("nameResult").className = "name-result"; }
+
+  function applyPick(m) {
+    state.picked = m;
+    $("pname").value = m["产品名称"] || "";
+  }
+  function resetPick() { state.picked = null; $("pname").value = ""; }
+
+  /* ---------- 多品名弹窗 ---------- */
+  function openModal() {
+    $("modalBarcode").textContent = $("barcode").value.trim();
+    $("modalCount").textContent = state.matches.length;
+    var list = $("modalList");
+    list.innerHTML = "";
+    state.matches.forEach(function (m, i) {
+      var row = document.createElement("div");
+      row.className = "cand";
+      row.innerHTML =
+        '<div class="cand-no"><span class="tag tag-blue">' + (m["产品编号"] || "-") + "</span></div>" +
+        '<div style="flex:1;min-width:0"><div class="cand-name">' + esc(m["产品名称"]) + '</div><div class="cand-bc">' + esc(m["货品条码"]) + "</div></div>" +
+        '<div class="pick">选择 (' + (i + 1) + ")</div>";
+      row.addEventListener("click", function () { closeModal(); applyPick(m); showNameResult("ok", "已选择品名", null); $("qty").focus(); });
+      list.appendChild(row);
+    });
+    $("overlay").classList.add("show");
+  }
+  function closeModal() { $("overlay").classList.remove("show"); }
+  document.addEventListener("keydown", function (e) {
+    if (!$("overlay").classList.contains("show")) return;
+    if (e.key === "Escape") closeModal();
+    var n = parseInt(e.key, 10);
+    if (n >= 1 && n <= state.matches.length) { closeModal(); applyPick(state.matches[n - 1]); showNameResult("ok", "已选择品名", null); $("qty").focus(); }
+  });
+  $("overlay").addEventListener("click", function (e) { if (e.target === this) closeModal(); });
+
+  /* ---------- 日期输入：8 位数字 20260916 ---------- */
+  document.querySelectorAll('input[data-date]').forEach(function (inp) {
+    inp.addEventListener("input", function () {
+      this.value = this.value.replace(/\D/g, "").slice(0, 8);
+    });
+  });
+  // 校验并转换：20260916 / 2026-09-16 / 2026/09/16 -> 2026/09/16；空返回空
+  function fmtDate(v) {
+    v = (v || "").trim();
+    if (!v) return "";
+    var m = v.match(/^(\d{4})[\/\-]?(\d{2})[\/\-]?(\d{2})$/);
+    if (!m) return null; // 格式错误
+    var y = +m[1], mo = +m[2], d = +m[3];
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    var dt = new Date(y, mo - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+    return y + "/" + (mo < 10 ? "0" + mo : mo) + "/" + (d < 10 ? "0" + d : d);
+  }
+
+  /* ---------- 提交 ---------- */
+  $("form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var msg = $("formMsg");
+    var bc = $("barcode").value.trim();
+    var loc = $("loc").value.trim();
+    var qty = $("qty").value.trim();
+    if (!bc) return setMsg("err", "请填写条码");
+    if (!state.picked) return setMsg("err", "请先等待条码识别并确认品名");
+    if (!loc) return setMsg("err", "请填写库位");
+    if (qty === "" || Number(qty) < 0) return setMsg("err", "请填写正确的数量");
+    var pd = fmtDate($("prodDate").value);
+    var ed = fmtDate($("expDate").value);
+    if (pd === null) return setMsg("err", "生产日期格式不对，请输 8 位数字如 20260916");
+    if (ed === null) return setMsg("err", "到期日期格式不对，请输 8 位数字如 20270916");
+
+    var data = {
+      "库位": loc,
+      "条码": bc,
+      "数量": Number(qty),
+      "生产日期": pd,
+      "到期日期": ed,
+      "产品编号": state.picked["产品编号"] || "",
+      "产品名称": state.picked["产品名称"] || ""
+    };
+    var btn = $("submitBtn");
+    btn.disabled = true; setMsg("", "提交中…");
+    fetch("/api/airscript", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ Context: { argv: { action: "submit", data: data } } })
+    }).then(function (r) { return r.json(); }).then(function (resp) {
+      btn.disabled = false;
+      var r = resp && resp.result;
+      if (r && r.code === 0) {
+        pushSession(data, r.skippedFields || []);
+        toast("ok", "提交成功，已写入多维表格");
+        setMsg("ok", "提交成功 · " + new Date().toLocaleTimeString("zh-CN", { hour12: false }));
+        // 保留库位，清空条码相关，方便连续扫码
+        resetPick(); hideNameResult();
+        $("barcode").value = ""; $("qty").value = ""; $("prodDate").value = ""; $("expDate").value = "";
+        $("barcode").focus();
+      } else {
+        toast("err", "提交失败");
+        setMsg("err", "提交失败：" + ((r && r.message) || (resp && resp.error) || "未知错误"));
+      }
+    }).catch(function (e2) {
+      btn.disabled = false;
+      toast("err", "提交失败");
+      setMsg("err", "请求失败：" + e2.message);
+    });
+  });
+
+  $("resetBtn").addEventListener("click", function () {
+    resetPick(); hideNameResult(); setMsg("", "");
+    $("barcode").value = ""; $("qty").value = ""; $("prodDate").value = ""; $("expDate").value = "";
+    $("barcode").focus();
+  });
+
+  function setMsg(cls, text) { var m = $("formMsg"); m.className = "form-msg " + cls; m.textContent = text; }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s === null || s === undefined ? "" : String(s); return d.innerHTML; }
+
+  /* ---------- 会话记录 ---------- */
+  function pushSession(d, skipped) {
+    state.session.unshift({ d: d, time: new Date() });
+    $("navCount").textContent = state.session.length;
+  }
+  function renderSession() {
+    var body = $("sessionBody");
+    if (!state.session.length) {
+      $("sessionCard").style.display = "none";
+      return;
+    }
+    $("sessionCard").style.display = "";
+    var rows = state.session.map(function (it, i) {
+      var d = it.d;
+      return "<tr><td>" + (state.session.length - i) + "</td><td>" + esc(d["条码"]) + "</td><td>" + esc(d["产品名称"]) +
+        '</td><td><span class="tag tag-green">' + esc(d["库位"]) + "</span></td><td>" + d["数量"] +
+        "</td><td>" + (d["生产日期"] || "-") + "</td><td>" + (d["到期日期"] || "-") + "</td></tr>";
+    });
+    body.innerHTML = rows.join("");
+  }
+
+  /* ---------- toast ---------- */
+  var toastTimer = null;
+  function toast(type, text) {
+    var t = $("toast");
+    var icon = type === "ok"
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+    t.className = "toast show " + type;
+    t.innerHTML = icon + "<span>" + text + "</span>";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.className = "toast"; }, 2400);
+  }
+
+  $("barcode").focus();
+})();
+</script>
+</body>
+</html>
