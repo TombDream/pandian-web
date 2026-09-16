@@ -180,7 +180,7 @@ if (action === "query") {
   var prodFields = getFieldNames(prod.name);
   var F_BC = findField(prodFields, "条码");
   var F_NAME = findField(prodFields, "名称");
-  var F_NO = findField(prodFields, "编号");
+  var F_NO = findField(prodFields, "编号") || findField(prodFields, "编码");
 
   // 字段名识别失败时不传 Fields，取全字段再按关键词找
   var recs = getAllRecords(prod.name, prodFields ? [F_BC, F_NAME, F_NO] : null);
@@ -190,7 +190,7 @@ if (action === "query") {
     for (var rk in recs[0].fields || {}) keys.push(rk);
     F_BC = findField(keys, "条码");
     F_NAME = findField(keys, "名称");
-    F_NO = findField(keys, "编号");
+    F_NO = findField(keys, "编号") || findField(keys, "编码");
   }
   if (!F_BC) return { code: 1, message: "产品表里找不到条码字段（需有一列列名含「条码」）" };
 
