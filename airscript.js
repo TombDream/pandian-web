@@ -29,10 +29,21 @@ function pickName(o) {
 }
 
 function getSheetId(name) {
-  var sheets = Application.Sheet.GetSheets();
-  for (var i = 0; i < sheets.length; i++) {
-    if (pickName(sheets[i]) === name) return pickId(sheets[i]);
-  }
+  // AirScript 2.0：Application.Sheets("表名")
+  try {
+    var sh = Application.Sheets(name);
+    if (sh) {
+      if (sh.Id !== undefined && sh.Id !== null) return sh.Id;
+      if (sh.id !== undefined && sh.id !== null) return sh.id;
+    }
+  } catch (e) {}
+  // AirScript 1.0 回退：Application.Sheet.GetSheets()
+  try {
+    var sheets = Application.Sheet.GetSheets();
+    for (var i = 0; i < sheets.length; i++) {
+      if (pickName(sheets[i]) === name) return pickId(sheets[i]);
+    }
+  } catch (e) {}
   return null;
 }
 
@@ -118,7 +129,11 @@ if (action === "submit") {
     }
   }
 
-  Application.Record.CreateRecords({ SheetId: targetId, Records: [{ fields: out }] });
+  try {
+    Application.Record.CreateRecords({ SheetId: targetId, Records: [{ fields: out }] });
+  } catch (e2) {
+    return { code: 1, action: "submit", message: "写入失败：" + (e2 && e2.message ? e2.message : String(e2)), data: out };
+  }
   return { code: 0, action: "submit", written: out, skippedFields: skipped };
 }
 
