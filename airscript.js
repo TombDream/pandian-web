@@ -16,9 +16,9 @@
  * ============================================================
  */
 
-// ===== 配置：数据表名称（按实际表名修改） =====
-var PRODUCT_SHEET = "货品资料"; // 条码对照表
-var TARGET_SHEET = "盘点数据"; // 提交写入的表
+// ===== 配置：数据表名称（按候选顺序自动匹配，可自行增删） =====
+var PRODUCT_SHEET_NAMES = ["产品资料表", "货品资料", "产品资料"]; // 条码对照表
+var TARGET_SHEET_NAMES = ["数据表", "盘点数据"]; // 提交写入的表
 
 // ===== 工具函数 =====
 function pickId(o) {
@@ -47,6 +47,39 @@ function getSheetId(name) {
   return null;
 }
 
+function getSheetIdByNames(names) {
+  for (var i = 0; i < names.length; i++) {
+    var id = getSheetId(names[i]);
+    if (id !== null) return { id: id, name: names[i] };
+  }
+  return null;
+}
+
+// 获取表的所有字段名（失败返回 null）
+function getFieldNames(sheetId) {
+  try {
+    var flds = Application.Field.GetFields({ SheetId: sheetId });
+    var list = flds.fields || flds || [];
+    var names = [];
+    for (var j = 0; j < list.length; j++) {
+      var n = list[j].name !== undefined ? list[j].name : list[j].Name;
+      if (n) names.push(n);
+    }
+    return names;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 在字段名列表里找包含关键词的字段
+function findField(names, keyword) {
+  if (!names) return null;
+  for (var i = 0; i < names.length; i++) {
+    if (String(names[i]).indexOf(keyword) !== -1) return names[i];
+  }
+  return null;
+}
+
 function getAllRecords(sheetId, fields) {
   var offset = null;
   var all = [];
@@ -72,25 +105,31 @@ function baseBarcode(s) {
 var argv = typeof Context !== "undefined" && Context.argv ? Context.argv : {};
 var action = argv.action || "query";
 
-var prodId = getSheetId(PRODUCT_SHEET);
-if (prodId === null) {
-  return { code: 1, message: "找不到数据表【" + PRODUCT_SHEET + "】，请检查脚本顶部配置" };
+var prod = getSheetIdByNames(PRODUCT_SHEET_NAMES);
+if (!prod) {
+  return { code: 1, message: "找不到产品资料表（tried: " + PRODUCT_SHEET_NAMES.join(" / ") + "）" };
 }
+
+// 自动识别产品表的字段名（条码/名称/编号列）
+var prodFields = getFieldNames(prod.id);
+var F_BC = findField(prodFields, "条码") || "货品条码";
+var F_NAME = findField(prodFields, "名称") || "产品名称";
+var F_NO = findField(prodFields, "编号") || "产品编号";
 
 // ---- 查询条码 ----
 if (action === "query") {
   var barcode = baseBarcode(argv.barcode);
   if (!barcode) return { code: 1, message: "条码为空" };
 
-  var recs = getAllRecords(prodId, ["产品编号", "产品名称", "货品条码"]);
+  var recs = getAllRecords(prod.id, [F_NO, F_NAME, F_BC]);
   var matches = [];
   for (var i = 0; i < recs.length; i++) {
     var f = recs[i].fields || {};
-    if (baseBarcode(f["货品条码"]) === barcode) {
+    if (baseBarcode(f[F_BC]) === barcode) {
       matches.push({
-        产品编号: f["产品编号"] === null || f["产品编号"] === undefined ? "" : String(f["产品编号"]),
-        产品名称: f["产品名称"] === null || f["产品名称"] === undefined ? "" : String(f["产品名称"]),
-        货品条码: f["货品条码"] === null || f["货品条码"] === undefined ? "" : String(f["货品条码"]),
+        产品编号: f[F_NO] === null || f[F_NO] === undefined ? "" : String(f[F_NO]),
+        产品名称: f[F_NAME] === null || f[F_NAME] === undefined ? "" : String(f[F_NAME]),
+        货品条码: f[F_BC] === null || f[F_BC] === undefined ? "" : String(f[F_BC]),
       });
     }
   }
@@ -99,24 +138,20 @@ if (action === "query") {
 
 // ---- 提交记录 ----
 if (action === "submit") {
-  var targetId = getSheetId(TARGET_SHEET);
-  if (targetId === null) {
-    return { code: 1, message: "找不到数据表【" + TARGET_SHEET + "】，请检查脚本顶部配置" };
+  var target = getSheetIdByNames(TARGET_SHEET_NAMES);
+  if (!target) {
+    return { code: 1, message: "找不到目标数据表（tried: " + TARGET_SHEET_NAMES.join(" / ") + "）" };
   }
 
   var data = argv.data || {};
   // 只写入目标表中已存在的字段，避免因缺列报错
   var exist = null;
   var skipped = [];
-  try {
-    exist = {};
-    var flds = Application.Field.GetFields({ SheetId: targetId });
-    var list = flds.fields || flds || [];
-    for (var j = 0; j < list.length; j++) {
-      var n = list[j].name !== undefined ? list[j].name : list[j].Name;
-      if (n) exist[n] = true;
-    }
-  } catch (e) {
+  exist = {};
+  var tf = getFieldNames(target.id);
+  if (tf) {
+    for (var t = 0; t < tf.length; t++) exist[tf[t]] = true;
+  } else {
     exist = null;
   }
 
@@ -130,7 +165,7 @@ if (action === "submit") {
   }
 
   try {
-    Application.Record.CreateRecords({ SheetId: targetId, Records: [{ fields: out }] });
+    Application.Record.CreateRecords({ SheetId: target.id, Records: [{ fields: out }] });
   } catch (e2) {
     return { code: 1, action: "submit", message: "写入失败：" + (e2 && e2.message ? e2.message : String(e2)), data: out };
   }
