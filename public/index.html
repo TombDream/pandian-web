@@ -118,6 +118,12 @@
   .cand .cand-bc{font-size:11.5px;color:var(--sub);font-family:ui-monospace,Consolas,monospace;margin-top:3px}
   .cand .pick{flex-shrink:0;font-size:12px;color:var(--blue);font-weight:600}
   .modal-foot{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--sub)}
+  .scan-btn{flex-shrink:0;display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:none;background:var(--blue-soft,#eef4ff);color:var(--blue,#2563eb);border-radius:8px;cursor:pointer;margin-left:6px}
+  .scan-btn:active{transform:scale(.94)}
+  #scanReader{width:100%;min-height:260px;background:#0b1020;position:relative;overflow:hidden}
+  #scanReader video{width:100%!important;height:auto!important;display:block}
+  #scanReader img[alt="Info icon"]{display:none}
+  #scanStatus{color:var(--sub)}
 
   /* 使用说明 */
   .help-steps{counter-reset:s}
@@ -205,6 +211,9 @@
               <div class="input-wrap" id="bcWrap">
                 <span class="lead-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6V4h2M18 4h2v2M20 18v2h-2M6 20H4v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg></span>
                 <input type="text" id="barcode" placeholder="扫码或输入货品条码" inputmode="numeric">
+                <button type="button" class="scan-btn" id="scanBtn" title="摄像头扫码">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M4 12h16"/></svg>
+                </button>
                 <span class="spin"></span>
               </div>
               <span class="hint">输完按 <span class="kbd">Enter</span> 或移开焦点自动查询品名</span>
@@ -315,8 +324,22 @@
   </div>
 </div>
 
+<!-- 摄像头扫码弹窗 -->
+<div class="overlay" id="scanOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M4 12h16"/></svg>摄像头扫码</h3>
+      <p>对准商品条码，识别后自动填入并查询品名</p>
+    </div>
+    <div id="scanReader"></div>
+    <div class="modal-foot"><span id="scanStatus">正在启动摄像头…</span><span>按 <span class="kbd">Esc</span> 或点空白处退出</span></div>
+  </div>
+</div>
+
 <!-- toast -->
 <div class="toast" id="toast"></div>
+
+<script src="html5-qrcode.min.js"></script>
 
 <script>
 (function () {
@@ -438,12 +461,56 @@
   }
   function closeModal() { $("overlay").classList.remove("show"); }
   document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && $("scanOverlay").classList.contains("show")) { closeScan(); return; }
     if (!$("overlay").classList.contains("show")) return;
     if (e.key === "Escape") closeModal();
     var n = parseInt(e.key, 10);
     if (n >= 1 && n <= state.matches.length) { closeModal(); applyPick(state.matches[n - 1]); showNameResult("ok", "已选择品名", null); $("qty").focus(); }
   });
   $("overlay").addEventListener("click", function (e) { if (e.target === this) closeModal(); });
+
+  /* ---------- 摄像头扫码 ---------- */
+  var scanner = null;
+  var lastScan = { text: "", t: 0 };
+  $("scanBtn").addEventListener("click", openScan);
+  $("scanOverlay").addEventListener("click", function (e) { if (e.target === this) closeScan(); });
+
+  function openScan() {
+    if (typeof Html5Qrcode === "undefined") {
+      showNameResult("none", "扫码组件未加载，请手动输入条码", null);
+      return;
+    }
+    $("scanOverlay").classList.add("show");
+    $("scanStatus").textContent = "正在启动摄像头…";
+    scanner = new Html5Qrcode("scanReader", { verbose: false });
+    scanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: function (vw, vh) { var s = Math.min(vw, vh) * 0.7; return { width: s, height: Math.max(120, s * 0.55) }; } },
+      function (text) {
+        var now = Date.now();
+        if (text === lastScan.text && now - lastScan.t < 2000) return;
+        lastScan = { text: text, t: now };
+        closeScan();
+        $("barcode").value = text;
+        queryBarcode();
+        $("qty").focus();
+      },
+      function () {}
+    ).then(function () {
+      $("scanStatus").textContent = "扫码中…对准条码即可自动识别";
+    }).catch(function (err) {
+      closeScan();
+      showNameResult("none", "摄像头启动失败：" + ((err && err.message) || err) + "（需 HTTPS 或 localhost 环境）", null);
+    });
+  }
+  function closeScan() {
+    $("scanOverlay").classList.remove("show");
+    if (scanner) {
+      var s = scanner; scanner = null;
+      s.stop().then(function () { s.clear(); }).catch(function () {});
+    }
+  }
+
 
   /* ---------- 日期输入：8 位数字 20260916 ---------- */
   document.querySelectorAll('input[data-date]').forEach(function (inp) {
